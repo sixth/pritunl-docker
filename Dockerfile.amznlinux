@@ -1,0 +1,23 @@
+FROM amazonlinux:2
+
+ARG TINI_VERSION=v0.18.0
+ARG MONGO_URI=mongodb://mongo:27017/pritunl
+ENV MONGO_URI=${MONGO_URI}
+ENV TINI_VERSION=${TINI_VERSION}
+
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /sbin/tini
+
+RUN printf '[pritunl] \nname=Pritunl Repository \nbaseurl=https://repo.pritunl.com/stable/yum/amazonlinux/2/ \ngpgcheck=1 \nenabled=1 \n' > /etc/yum.repos.d/pritunl.repo && \
+    rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
+    gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys 7568D9BB55FF9E5287D586017AE645C0CF8E292A && \
+    gpg --armor --export 7568D9BB55FF9E5287D586017AE645C0CF8E292A > key.tmp; rpm --import key.tmp; rm -f key.tmp && \
+    yum -y -q update && \
+    yum -y -q install procps pritunl && \
+    rm -rf /var/cache/yum/* && \
+    chmod +x /sbin/tini && \
+    pritunl set-mongodb $MONGO_URI
+
+EXPOSE 80 443 1194/udp
+
+ENTRYPOINT ["/sbin/tini","--"]
+CMD ["pritunl","start"]
